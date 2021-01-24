@@ -1,0 +1,149 @@
+---
+title: "Practical Introduction to Cluster Analysis"
+author: "Fokoue, Ernest - School of Mathematical Sciences"
+output:
+  html_document:
+    df_print: paged
+---
+
+Unsupervised Learning forms one of the largest components of statistical machine learning, with cluster analysis being one of its most used subbranches. This introduction to cluster analysis features kMeans clustering along with hierarchical clustering and a little bit of model based clustering via Gaussian Mixture Modeling 
+
+```{R}
+library(cluster)
+library(clValid)
+library(sna)
+library(igraph)
+library(qgraph)
+library(network)
+library(kohonen)
+library(mclust)
+library(xtable)
+```
+
+A rather interesting dataset to start with is the famous ruspini dataset in the plane (2 dimensional space)
+
+```{R}
+x <- ruspini   # This is a 2D data set found in library(cluster)
+
+str(x)
+
+xtable(head(x))
+```
+
+
+# kMeans clustering
+
+The kMeans clustering algorithm is arguably by quite a number of accounts the most used method (among the top two most used methods) in the whole of statistical machine learning, being it that it can be applied to so many contexts and is both lightning fast and intuitively appealing.
+
+```{R}
+xx    <- x
+bcss  <- wcss<- NULL
+n     <- nrow(xx)
+max.k <- round(n-1)
+
+for(k in 1:max.k)
+{
+  kmeans.xx <- kmeans(xx, k) 
+  bcss <- c(bcss,kmeans.xx$betweenss)
+  wcss <- c(wcss,kmeans.xx$tot.withinss)
+}
+
+par(mfrow=c(1,2))
+plot(bcss, type='b')
+plot(wcss, type='b')
+```
+
+#  Exercise 
+-    (a) Where does the elbow. Indicate the percentage of variation thereof
+-    (b) Examine the means of the kmeans for that elbow position
+
+  
+
+#  Hierarchical Clustering
+
+Hierarchical clustering is also a very intuively appealing approach to unsupervised classification, with its greatest benefit being the generation of the interpretable graphical tree-like output known as the dendrogram.
+
+```{R}
+dist_m <- dist(x, method='manhattan')
+hclust.x <- hclust(as.dist(dist_m), method='ward.D2')
+
+plot(hclust.x, hang=-1)
+rect.hclust(hclust.x, k = 2, border = 2)
+```
+
+#  Exercise
+-   (a) Try various linkages and variation distances 
+-   (b) Try various cuts
+    
+
+
+#  Model based clustering with Gaussian Mixture Models
+
+The use of the gaussian mixture model for clustering is the model based extension of the kmeans clustering
+algorithm whereby some of the limiting assumptions underlying the kmeans clustering algorithm are removed.
+
+```{R}
+mclust.x <- Mclust(x, G=1:9)
+print(mclust.x)
+
+par(mfrow=c(2,2))
+plot(mclust.x, what = "BIC")
+plot(mclust.x, what = "classification")
+plot(mclust.x, what = "uncertainty")
+plot(mclust.x, what = "classification")
+```
+
+
+# Nice plotting of clustering as network
+
+While the dendrogram from hierarchical clustering is of great interest, it is typically not of the greatest graphical quality. Representing the clusters as a graph turns out to yield graphically appealing clustering results.
+
+```{R}
+dist_m <- dist(x, method='manhattan')
+dist_mi <- exp(-0.054*dist_m)
+#dist_mi <- 1/(1+dist_m)
+
+grouping     <- cutree(hclust.x, k = 2)
+groups.x <- list(which(grouping==1), which(grouping==2)) #, which(grouping==3), which(grouping==4))
+graph4 <- qgraph(dist_mi, layout="spring", 
+                 sampleSize = nrow(dist_mi), groups=groups.x, 
+                 color=2:3,
+                 vsize=7, cut=0, maximum=.45, 
+                 border.width=1.5)
+
+pam.x <- pam(x, k=4, metric='euclidean')
+grouping <- pam.x$clustering
+groups.x <- list(which(grouping==1), which(grouping==2), which(grouping==3), which(grouping==4))
+dist_m <- dist(x, method='euclidean')
+dist_mi <- exp(-0.07*dist_m)
+graph4 <- qgraph(dist_mi, layout="spring", 
+                 sampleSize = nrow(dist_mi), groups=groups.x, 
+                 color=2:5,
+                 vsize=7, cut=0, maximum=.45, 
+                 border.width=1.5)
+
+```
+
+# Clustering Validation
+
+The unsupervised nature of clustering makes the formal assessment of the performance of derived models somewhat more challenging than was the case with supervised learning. Clustering validation uses various measures like internal consistency to compare several clustering results in order to identify/determine
+for a given dataset and several models of clustering, which of the models best captures the pattern underlying the data
+
+```{R}
+## internal validation
+intern <- clValid(x, 2:6, clMethods=c("hierarchical","kmeans","pam", "som", "sota"),
+                  validation="internal")
+
+## view results
+summary(intern)
+optimalScores(intern)
+windows()
+par(mfrow=c(2,2))
+plot(intern)
+```
+
+
+# Exercise     
+Redo all the above using the data set read.csv('europe.csv')
+-     (a) Try various linkages and various distances
+-     (b) Comment extensively on cluster validation
